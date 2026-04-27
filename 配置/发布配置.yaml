@@ -1,0 +1,18 @@
+paths:
+  base_dir: "/Users/j2/.hermes/wechat-article-workflow"
+
+wechat:
+  appid_env: "WECHAT_APPID"
+  secret_env: "WECHAT_SECRET"
+
+md2wechat:
+  run_script: "/Users/j2/.hermes/skills/openclaw-imports/md2wechat/scripts/run.sh"
+  mode: "api"
+  theme: "default"
+  draft: true
+
+rewrite_api:
+  base_url_env: "REWRITE_API_BASE_URL"
+  api_key_env: "REWRITE_API_KEY"
+  model_env: "REWRITE_MODEL"
+  timeout_seconds: 180

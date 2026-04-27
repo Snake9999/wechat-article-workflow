@@ -1,0 +1,10 @@
+requests
+beautifulsoup4
+lxml
+trafilatura
+markdownify
+pyyaml
+sqlalchemy
+python-dateutil
+openai
+python-dotenv

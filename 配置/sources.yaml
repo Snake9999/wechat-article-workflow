@@ -1,0 +1,25 @@
+sources:
+  - source_id: MP_WXS_3223096120
+    source_name: 数字生命卡兹克
+    enabled: true
+    upstream_type: wewe_rss
+    category: AI资讯
+    priority: 100
+    feed_url: http://127.0.0.1:4000/feeds/MP_WXS_3223096120
+    fulltext_url: ""
+    include_keywords:
+      - OpenAI
+      - Anthropic
+      - DeepSeek
+      - 豆包
+      - 千问
+      - Claude
+      - GPT
+      - AI
+    exclude_keywords:
+      - 招聘
+      - 活动报名
+    rewrite_enabled: true
+    publish_enabled: false
+    owner: 你自己
+    note: 已接入本地 WeWe RSS 实际 feed，先验证抓取→改写→草稿箱链路

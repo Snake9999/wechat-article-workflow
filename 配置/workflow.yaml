@@ -1,0 +1,45 @@
+workflow:
+  project_name: 公众号内容中台工作流
+  base_dir: /Users/j2/.hermes/wechat-article-workflow
+  timezone: Asia/Shanghai
+
+  upstream:
+    provider: wewe_rss
+    base_url: http://127.0.0.1:4000
+    pull_window_hours: 48
+    request_timeout_seconds: 30
+    user_agent: Mozilla/5.0 (Hermes WeChat Workflow)
+
+  storage:
+    sqlite_path: /Users/j2/.hermes/wechat-article-workflow/数据/content_pipeline.db
+    raw_dir: /Users/j2/.hermes/wechat-article-workflow/原文归档
+    cleaned_dir: /Users/j2/.hermes/wechat-article-workflow/清洗结果
+    rewritten_dir: /Users/j2/.hermes/wechat-article-workflow/改写结果
+    publish_dir: /Users/j2/.hermes/wechat-article-workflow/发布结果
+    log_dir: /Users/j2/.hermes/wechat-article-workflow/日志
+
+  rewrite:
+    enabled: true
+    provider: openai_compatible
+    base_url_env: REWRITE_API_BASE_URL
+    api_key_env: REWRITE_API_KEY
+    model_env: REWRITE_MODEL
+    timeout_seconds: 180
+    max_input_chars: 12000
+    output_versions:
+      - dan_koe
+      - humanized
+
+  md2wechat:
+    enabled: true
+    run_script: /Users/j2/.hermes/skills/openclaw-imports/md2wechat/scripts/run.sh
+    mode: api
+    theme: default
+    draft_enabled: true
+    cover_strategy: first_image
+    title_suffix: ""
+
+  notifications:
+    feishu_webhook_env: FEISHU_WEBHOOK_URL
+    notify_on_draft_created: true
+    notify_on_failure: true

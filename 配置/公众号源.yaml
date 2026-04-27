@@ -1,0 +1,7 @@
+sources:
+  - name: "示例公众号"
+    enabled: false
+    keywords:
+      - "AI"
+      - "OpenAI"
+      - "Anthropic"
