@@ -2,6 +2,12 @@
 
 这个项目后续适合封装成一个 Hermes skill。
 
+建议 skill 名称：
+- wechat-article-workflow
+
+建议 skill 描述：
+- 从 WeWe/VVISS 拉取公众号文章，补抓正文，双版本改写，并推送到公众号草稿箱。
+
 建议的 skill 目标：
 - 让其他智能体或同事，拿到仓库后可以快速完成：
   1. 环境配置

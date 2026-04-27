@@ -1,7 +1,11 @@
 import argparse
 import json
 import os
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -10,7 +14,41 @@ from 内容数据库 import 内容数据库
 from 发布草稿 import 发布到草稿箱
 
 
-ROOT = Path("/Users/j2/.hermes/wechat-article-workflow")
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def 下载封面到本地(url: str) -> str:
+    parsed = urlparse(url)
+    suffix = Path(parsed.path).suffix or ".jpg"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        local_path = tmp.name
+    subprocess.run(["curl", "-L", "--fail", url, "-o", local_path], check=True, capture_output=True, text=True)
+    return local_path
+
+
+def 清理临时文件(path: str) -> None:
+    if path and Path(path).exists():
+        Path(path).unlink()
+
+
+def 解析草稿结果(result: dict) -> tuple[str, str]:
+    draft_media_id = ""
+    draft_url = ""
+    for stream_name in ["stderr", "stdout", "raw_output"]:
+        content = result.get(stream_name, "") or ""
+        for line in content.splitlines():
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if payload.get("msg") != "draft created":
+                continue
+            draft_media_id = payload.get("media_id") or draft_media_id
+            draft_url = payload.get("draft_url") or draft_url
+    return draft_media_id, draft_url
 
 
 def getenv_required(name: str) -> str:
@@ -60,67 +98,85 @@ def main():
 
         raw_row = db.查询一条("SELECT * FROM raw_articles WHERE id = ?", (row["raw_article_id"],))
         cover = ""
-        if raw_row and raw_row.get("cover_image"):
-            cover_result = 发布到草稿箱.__globals__.get("subprocess")
-            cmd = ["bash", md2wechat_conf["run_script"], "download_and_upload", raw_row["cover_image"]]
-            upload = cover_result.run(cmd, capture_output=True, text=True, env=os.environ.copy())
-            combined = "\n".join(part for part in [upload.stdout, upload.stderr] if part).strip()
-            if upload.returncode != 0:
-                raise RuntimeError(combined or "封面上传失败")
-            for line in reversed((upload.stdout or "").splitlines()):
-                line = line.strip()
-                if not line.startswith("{"):
-                    continue
-                try:
-                    parsed = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if parsed.get("success") and parsed.get("data", {}).get("wechat_url"):
-                    cover = parsed["data"]["wechat_url"]
-                    break
-            if not cover:
-                try:
-                    parsed = json.loads(upload.stdout or "{}")
-                    if parsed.get("success") and parsed.get("data", {}).get("wechat_url"):
-                        cover = parsed["data"]["wechat_url"]
-                except json.JSONDecodeError:
-                    pass
+        temp_cover = ""
+        try:
+            if raw_row and raw_row.get("cover_image"):
+                temp_cover = 下载封面到本地(raw_row["cover_image"])
+                cover = temp_cover
 
-        result = 发布到草稿箱(
-            md2wechat_script=md2wechat_conf["run_script"],
-            markdown_path=markdown_path,
-            mode=md2wechat_conf.get("mode", "api"),
-            theme=md2wechat_conf.get("theme", "default"),
-            cover=cover,
-        )
+            result = 发布到草稿箱(
+                md2wechat_script=md2wechat_conf["run_script"],
+                markdown_path=markdown_path,
+                mode=md2wechat_conf.get("mode", "api"),
+                theme=md2wechat_conf.get("theme", "default"),
+                cover=cover,
+            )
 
-        result_path = ROOT / "发布结果" / f"publish_job_{row['id']}_{args.version}.json"
-        写入_json(str(result_path), result)
+            result_path = ROOT / "发布结果" / f"publish_job_{row['id']}_{args.version}.json"
+            写入_json(str(result_path), result)
+            draft_media_id, draft_url = 解析草稿结果(result)
+            if not draft_media_id:
+                raise RuntimeError("草稿创建结果缺少 media_id，不能标记为成功")
 
-        draft_title = row["humanized_title"] if args.version == "humanized" else row["dan_koe_title"]
-        db.执行(
-            """
-            INSERT INTO publish_jobs (
-              rewritten_article_id, publish_channel, publish_version, draft_title,
-              markdown_path, cover_path, draft_media_id, draft_url,
-              publish_status, result_json_path, error_message
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                row["id"],
-                "wechat_draft",
-                args.version,
-                draft_title,
-                markdown_path,
-                "",
-                "",
-                "",
-                "draft_created",
-                str(result_path),
-                "",
-            ),
-        )
-        pushed += 1
+            draft_title = row["humanized_title"] if args.version == "humanized" else row["dan_koe_title"]
+            stable_cover_path = ""
+            if temp_cover:
+                cover_dir = ROOT / "发布结果" / "封面缓存"
+                cover_dir.mkdir(parents=True, exist_ok=True)
+                stable_cover_path = str(cover_dir / f"publish_job_{row['id']}_{args.version}{Path(temp_cover).suffix or '.jpg'}")
+                shutil.copy(temp_cover, stable_cover_path)
+
+            db.执行(
+                """
+                INSERT INTO publish_jobs (
+                  rewritten_article_id, publish_channel, publish_version, draft_title,
+                  markdown_path, cover_path, draft_media_id, draft_url,
+                  publish_status, result_json_path, error_message
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["id"],
+                    "wechat_draft",
+                    args.version,
+                    draft_title,
+                    markdown_path,
+                    stable_cover_path,
+                    draft_media_id,
+                    draft_url,
+                    "draft_created",
+                    str(result_path),
+                    "",
+                ),
+            )
+            pushed += 1
+        except Exception as e:
+            result_path = ROOT / "发布结果" / f"publish_job_{row['id']}_{args.version}_error.json"
+            写入_json(str(result_path), {"error": str(e)})
+            draft_title = row["humanized_title"] if args.version == "humanized" else row["dan_koe_title"]
+            db.执行(
+                """
+                INSERT INTO publish_jobs (
+                  rewritten_article_id, publish_channel, publish_version, draft_title,
+                  markdown_path, cover_path, draft_media_id, draft_url,
+                  publish_status, result_json_path, error_message
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["id"],
+                    "wechat_draft",
+                    args.version,
+                    draft_title,
+                    markdown_path,
+                    "",
+                    "",
+                    "",
+                    "failed",
+                    str(result_path),
+                    str(e),
+                ),
+            )
+        finally:
+            清理临时文件(temp_cover)
 
     print(f"pushed={pushed}")
 

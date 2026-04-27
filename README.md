@@ -16,7 +16,7 @@
 2. 复制 `.env.example` 为 `.env`
 3. 配置 `配置/` 下 yaml 文件
 4. 配置 `~/.config/md2wechat/config.yaml`
-5. 执行入口脚本
+5. 优先执行 `入口/` 目录中的脚本
 
 ## 推荐执行顺序
 
@@ -51,6 +51,8 @@ python3 入口/一键运行.py
 
 ## 文档
 
+- `docs/使用指南.md`
+- `docs/skill化说明.md`
 - `docs/开源整理计划.md`
 - `docs/公众号内容中台工作流.md`
 - `docs/WeWeRSS部署方案.md`
