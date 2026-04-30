@@ -63,19 +63,19 @@ cp .env.example .env
 最少要填这些：
 
 ```bash
-WECHAT_APPID=
-WECHAT_SECRET=
-REWRITE_API_BASE_URL=
-REWRITE_API_KEY=***
-REWRITE_MODEL=
+WECHAT_APPID=<your appid>
+WECHAT_SECRET=<your secret>
+REWRITE_API_BASE_URL=<your base url>
+REWRITE_API_KEY=<your api key>
+REWRITE_MODEL=<your model>
 ```
 
 如果你要自动生成封面图，还要再填：
 
 ```bash
-OPENAI_IMAGE_API_KEY=***
-OPENAI_IMAGE_BASE_URL=
-OPENAI_IMAGE_MODEL=gpt-image-1
+OPENAI_IMAGE_API_KEY=<your image api key>
+OPENAI_IMAGE_BASE_URL=<your image base url>
+OPENAI_IMAGE_MODEL=<your image model>
 ```
 
 补充说明：
