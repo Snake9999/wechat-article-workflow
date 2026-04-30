@@ -3,6 +3,8 @@ import html
 import json
 import urllib.request
 import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from 中台工具 import 读取_yaml, 写入文本, 写入_json, 项目内路径, 计算内容哈希
@@ -11,6 +13,43 @@ from 清洗文章 import 清洗_markdown
 
 
 ROOT = Path("/Users/j2/.hermes/wechat-article-workflow")
+DEFAULT_LOOKBACK_HOURS = 36
+
+
+def 解析发布时间(value: str) -> datetime | None:
+    text = (value or "").strip()
+    if not text:
+        return None
+
+    iso_candidates = [text]
+    if text.endswith("Z"):
+        iso_candidates.insert(0, text[:-1] + "+00:00")
+
+    for candidate in iso_candidates:
+        try:
+            dt = datetime.fromisoformat(candidate)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        except ValueError:
+            pass
+
+    try:
+        dt = parsedate_to_datetime(text)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return None
+
+
+
+def 是否在最近小时内(published_at: datetime | None, hours: int, now: datetime | None = None) -> bool:
+    if published_at is None:
+        return True
+    current = now or datetime.now(timezone.utc)
+    cutoff = current - timedelta(hours=hours)
+    return published_at >= cutoff
 
 
 def 获取文本(url: str, timeout: int, user_agent: str) -> str:
@@ -76,10 +115,10 @@ def 解析RSS(xml_text: str) -> list[dict]:
     return items
 
 
-def 保存原文(db: 内容数据库, source: dict, item: dict, raw_xml: str, workflow: dict) -> None:
+def 保存原文(db: 内容数据库, source: dict, item: dict, raw_xml: str, workflow: dict) -> bool:
     existed = db.根据URL查询原文(item["link"])
     if existed:
-        return
+        return False
 
     base_dir = workflow["base_dir"]
     title = item["title"] or "未命名文章"
@@ -127,12 +166,14 @@ def 保存原文(db: 内容数据库, source: dict, item: dict, raw_xml: str, wo
             "",
         ),
     )
+    return True
 
 
 def main():
-    parser = argparse.ArgumentParser(description="从 WeWe RSS 拉取文章到业务库")
+    parser = argparse.ArgumentParser(description="从 WeWe - RSS 拉取文章到业务库")
     parser.add_argument("--workflow", default=str(ROOT / "配置" / "workflow.yaml"))
     parser.add_argument("--sources", default=str(ROOT / "配置" / "sources.yaml"))
+    parser.add_argument("--lookback-hours", type=int, default=DEFAULT_LOOKBACK_HOURS)
     args = parser.parse_args()
 
     workflow = 读取_yaml(args.workflow)["workflow"]
@@ -143,6 +184,7 @@ def main():
 
     db = 内容数据库(sqlite_path)
     pulled = 0
+    skipped_old = 0
     for source in sources:
         if not source.get("enabled", True):
             continue
@@ -152,10 +194,14 @@ def main():
         xml_text = 获取文本(feed_url, timeout=timeout, user_agent=user_agent)
         items = 解析RSS(xml_text)
         for item in items:
-            保存原文(db, source, item, xml_text, workflow)
-            pulled += 1
+            published_at = 解析发布时间(item.get("pubDate", ""))
+            if not 是否在最近小时内(published_at, args.lookback_hours):
+                skipped_old += 1
+                continue
+            if 保存原文(db, source, item, xml_text, workflow):
+                pulled += 1
 
-    print(json.dumps({"success": True, "pulled": pulled, "db": sqlite_path}, ensure_ascii=False))
+    print(json.dumps({"success": True, "pulled": pulled, "skipped_old": skipped_old, "lookback_hours": args.lookback_hours, "db": sqlite_path}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

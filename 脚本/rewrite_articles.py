@@ -4,19 +4,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from 中台工具 import 读取_yaml, 读取文本, 写入文本, 计算内容哈希, 项目内路径
+from 中台工具 import 读取_yaml, 读取文本, 写入文本, 计算内容哈希, 项目内路径, 解析Chat模型配置
 from 内容数据库 import 内容数据库
 from 改写文章 import 生成_dan_koe版, 生成去AI味版
 
 
 ROOT = Path("/Users/j2/.hermes/wechat-article-workflow")
-
-
-def getenv_required(name: str) -> str:
-    value = os.getenv(name, "").strip()
-    if not value:
-        raise RuntimeError(f"缺少环境变量: {name}")
-    return value
 
 
 def main():
@@ -33,9 +26,14 @@ def main():
     db = 内容数据库(sqlite_path)
 
     rewrite_conf = workflow["rewrite"]
-    base_url = getenv_required(rewrite_conf["base_url_env"])
-    api_key = getenv_required(rewrite_conf["api_key_env"])
-    model = getenv_required(rewrite_conf["model_env"])
+    chat_conf = 解析Chat模型配置(
+        rewrite_conf["base_url_env"],
+        rewrite_conf["api_key_env"],
+        rewrite_conf["model_env"],
+    )
+    base_url = chat_conf["base_url"]
+    api_key = chat_conf["api_key"]
+    model = chat_conf["model"]
     timeout_seconds = int(rewrite_conf.get("timeout_seconds", 180))
 
     rows = db.查询多条(
@@ -118,3 +116,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -30,6 +30,15 @@ workflow:
       - dan_koe
       - humanized
 
+  cover_image:
+    enabled: true
+    api_key_env: OPENAI_IMAGE_API_KEY
+    base_url_env: OPENAI_IMAGE_BASE_URL
+    model_env: OPENAI_IMAGE_MODEL
+    timeout_seconds: 180
+    image_size: 1792x1024
+    output_format: png
+
   md2wechat:
     enabled: true
     run_script: /Users/j2/.hermes/skills/openclaw-imports/md2wechat/scripts/run.sh

@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
-from 中台工具 import 读取_yaml, 写入_json
+from 中台工具 import 读取_yaml, 写入_json, 项目内路径
 from 内容数据库 import 内容数据库
 from 发布草稿 import 发布到草稿箱
 
@@ -97,10 +97,13 @@ def main():
             continue
 
         raw_row = db.查询一条("SELECT * FROM raw_articles WHERE id = ?", (row["raw_article_id"],))
+        generated_cover_path = 项目内路径(workflow["base_dir"], "发布结果", row["raw_title"], f"封面图_{args.version}.png")
         cover = ""
         temp_cover = ""
         try:
-            if raw_row and raw_row.get("cover_image"):
+            if Path(generated_cover_path).exists():
+                cover = str(generated_cover_path)
+            elif raw_row and raw_row.get("cover_image"):
                 temp_cover = 下载封面到本地(raw_row["cover_image"])
                 cover = temp_cover
 

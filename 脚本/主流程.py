@@ -7,7 +7,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from 数据库 import 初始化数据库, Article
-from 工具 import 读取_yaml, 写入文本, 写入_json, 项目内路径
+from 工具 import 读取_yaml, 写入文本, 写入_json, 项目内路径, 解析Chat模型配置
 from 抓取文章 import 抓取文章
 from 文章质检 import 校验抓取结果
 from 清洗文章 import 清洗_markdown
@@ -16,13 +16,6 @@ from 发布草稿 import 发布到草稿箱
 
 
 最小正文长度默认值 = 500
-
-
-def 读取环境变量(name: str, required: bool = True) -> str:
-    value = os.getenv(name, "").strip()
-    if required and not value:
-        raise RuntimeError(f"缺少环境变量: {name}")
-    return value
 
 
 def main():
@@ -85,9 +78,14 @@ def main():
         写入文本(str(cleaned_md_path), cleaned_md)
 
         rewrite_api_conf = 发布配置["rewrite_api"]
-        base_url = 读取环境变量(rewrite_api_conf["base_url_env"])
-        api_key = 读取环境变量(rewrite_api_conf["api_key_env"])
-        model = 读取环境变量(rewrite_api_conf["model_env"])
+        chat_conf = 解析Chat模型配置(
+            rewrite_api_conf["base_url_env"],
+            rewrite_api_conf["api_key_env"],
+            rewrite_api_conf["model_env"],
+        )
+        base_url = chat_conf["base_url"]
+        api_key = chat_conf["api_key"]
+        model = chat_conf["model"]
         timeout_seconds = int(rewrite_api_conf.get("timeout_seconds", 180))
 
         dan_md = 生成_dan_koe版(
@@ -139,48 +137,22 @@ def main():
             )
 
             写入_json(str(draft_result_path), 发布结果)
-
-            record.draft_result_path = str(draft_result_path)
-            record.status = "draft_uploaded"
-            record.updated_at = datetime.utcnow()
+            record.status = "draft_created"
             db.commit()
 
-        print("流程完成")
-        print(f"标题：{标题}")
-        print(f"原文归档：{raw_html_path}")
-        print(f"正文HTML：{content_html_path}")
-        print(f"抓取结果：{article_json_path}")
-        print(f"质检结果：{quality_report_path}")
-        print(f"清洗结果：{cleaned_md_path}")
-        print(f"DanKoe版：{dan_md_path}")
-        print(f"去AI味版：{human_md_path}")
-        if not args.skip_publish:
-            print(f"发布结果：{draft_result_path}")
+        print(f"处理完成：{标题}")
 
     except Exception as e:
-        错误信息 = f"{type(e).__name__}: {str(e)}\n\n{traceback.format_exc()}"
-
-        if record is None:
-            record = Article(
-                title="处理失败",
-                source_name="",
-                source_url=args.url,
-                publish_time="",
-                status="failed",
-                error_message=错误信息
-            )
-            db.add(record)
-        else:
-            record.status = "failed"
-            record.error_message = 错误信息
-            record.updated_at = datetime.utcnow()
-
-        db.commit()
-
-        print("流程失败")
-        print(错误信息)
+        if record:
+            db.delete(record)
+            db.commit()
+        print(f"处理失败：{e}")
+        traceback.print_exc()
         raise
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":
     main()
+

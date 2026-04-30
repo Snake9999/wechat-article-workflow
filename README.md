@@ -3,12 +3,13 @@
 这是一个把公众号文章拉取、补抓正文、双版本改写、推送到公众号草稿箱的工作流。
 
 当前能力：
-1. 从 WeWe / VVISS 来源拉取文章
+1. 从 WeWe - RSS 来源拉取文章
 2. 补抓公众号正文并做质检
 3. 生成双版本改写
    - DanKoe版
    - 去AI味版
-4. 推送到微信公众号草稿箱
+4. 生成封面提示词与封面图
+5. 推送到微信公众号草稿箱
 
 ## 快速开始
 
@@ -48,6 +49,8 @@ python3 入口/一键运行.py
 2. 微信公众号必须配置 IP 白名单
 3. md2wechat 的 API key 不能缺失
 4. 草稿封面优先使用本地文件路径，不要直接传远程 URL
+5. `REWRITE_API_BASE_URL` / `REWRITE_API_KEY` / `REWRITE_MODEL` 若未在项目 `.env` 中完整配置，会自动回退继承 `~/.hermes/config.yaml` 的主 Chat 模型配置
+6. `发布结果/`、`tmp_test_cover.png` 等本地产物不要提交到仓库
 
 ## 文档
 
@@ -56,3 +59,4 @@ python3 入口/一键运行.py
 - `docs/开源整理计划.md`
 - `docs/公众号内容中台工作流.md`
 - `docs/WeWeRSS部署方案.md`
+

@@ -96,7 +96,7 @@ def 回填原文(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="批量补抓 WeWe RSS 入库文章的公众号正文")
+    parser = argparse.ArgumentParser(description="批量补抓 WeWe - RSS 入库文章的公众号正文")
     parser.add_argument("--workflow", default=str(ROOT / "配置" / "workflow.yaml"))
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--min-text-length", type=int, default=最小正文长度默认值)

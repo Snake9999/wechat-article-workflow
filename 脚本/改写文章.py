@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import json
 
 
 HERMES_AGENT_ROOT = Path("/Users/j2/.hermes/hermes-agent")
@@ -20,6 +21,44 @@ def _创建客户端(base_url: str, api_key: str, model: str):
     if client is None:
         raise RuntimeError("无法创建改写模型客户端")
     return client, resolved_model or model
+
+
+def _提取响应文本(resp) -> str:
+    if isinstance(resp, str):
+        for block in resp.splitlines():
+            line = block.strip()
+            if not line or not line.startswith("data:"):
+                continue
+            payload = line[5:].strip()
+            if not payload or payload == "[DONE]":
+                continue
+            try:
+                obj = json.loads(payload)
+            except json.JSONDecodeError:
+                continue
+            choices = obj.get("choices") or []
+            if choices:
+                message = choices[0].get("message") or {}
+                content = message.get("content")
+                if isinstance(content, str) and content.strip():
+                    return content.strip()
+        text = resp.strip()
+        if text:
+            return text
+        raise RuntimeError("改写接口返回空内容")
+
+    output_text = getattr(resp, "output_text", None)
+    if isinstance(output_text, str) and output_text.strip():
+        return output_text.strip()
+
+    choices = getattr(resp, "choices", None)
+    if choices:
+        message = getattr(choices[0], "message", None)
+        content = getattr(message, "content", None)
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+    raise RuntimeError("改写接口返回空内容")
+
 
 
 def _调用改写模型(
@@ -50,9 +89,7 @@ def _调用改写模型(
         timeout=timeout_seconds
     )
 
-    text = resp.choices[0].message.content
-    if not text:
-        raise RuntimeError("改写接口返回空内容")
+    text = _提取响应文本(resp)
     return text.strip()
 
 
